@@ -1,0 +1,82 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Package APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Grant Execute Permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Keystore
+        run: |
+          if [ -f anydown-release.jks ] && [ ! -f app/anydown-release.jks ]; then
+            cp anydown-release.jks app/anydown-release.jks
+          fi
+
+      - name: Reassemble Native FFmpeg Libraries
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          if compgen -G "app/src/main/native-parts/arm64-v8a/libffmpeg.so.part-*" > /dev/null; then
+            echo "Reassembling libffmpeg.so from native-parts..."
+            cat app/src/main/native-parts/arm64-v8a/libffmpeg.so.part-* > app/src/main/jniLibs/arm64-v8a/libffmpeg.so
+            chmod +x app/src/main/jniLibs/arm64-v8a/libffmpeg.so
+          fi
+          if [ ! -f "app/src/main/jniLibs/arm64-v8a/libffmpeg.so" ] || [ ! -s "app/src/main/jniLibs/arm64-v8a/libffmpeg.so" ]; then
+            echo "Downloading full FFmpeg arm64 binary fallback..."
+            curl -sL "https://github.com/Tyrrrz/FFmpegBin/releases/download/9.0.2/ffmpeg-android-arm64.zip" -o /tmp/ffmpeg.zip
+            unzip -q -o /tmp/ffmpeg.zip -d /tmp/ffmpeg-extracted
+            cp /tmp/ffmpeg-extracted/ffmpeg app/src/main/jniLibs/arm64-v8a/libffmpeg.so
+            chmod +x app/src/main/jniLibs/arm64-v8a/libffmpeg.so
+          fi
+
+          # Install patchelf and package libc++_shared.so from NDK
+          sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
+          LIBCXX=$(find $ANDROID_HOME/ndk -name "libc++_shared.so" 2>/dev/null | grep "aarch64" | head -n 1)
+          if [ -n "$LIBCXX" ] && [ -f "$LIBCXX" ]; then
+            echo "Packaging NDK libc++_shared.so from $LIBCXX"
+            cp "$LIBCXX" app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+            chmod +x app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+          fi
+          if [ -f "app/src/main/jniLibs/arm64-v8a/libffmpeg.so" ]; then
+            echo "Patching RPATH on libffmpeg.so to \$ORIGIN..."
+            patchelf --set-rpath '$ORIGIN' app/src/main/jniLibs/arm64-v8a/libffmpeg.so || true
+          fi
+
+          echo "Native libraries packaged:"
+          ls -lh app/src/main/jniLibs/arm64-v8a/
+
+      - name: Build Debug APK with Gradle 9
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anydown-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
