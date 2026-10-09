@@ -1,0 +1,38 @@
+name: Sync From AI Studio
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout anydown-native
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone latest code from anydown-aistudio
+        run: |
+          git clone https://github.com/boom1908/anydown-aistudio.git /tmp/aistudio
+          # Exclude .git and .github/workflows so GitHub allows the push
+          rm -rf /tmp/aistudio/.git
+          rm -rf /tmp/aistudio/.github/workflows
+
+      - name: Replace repository files
+        run: |
+          # Delete old source files, keeping .git and .github intact
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
+          # Copy all new app files, assets, and keystore
+          cp -a /tmp/aistudio/. .
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Upgrade to v3.0.0 from anydown-aistudio" || echo "No changes to commit"
+          git push origin master
