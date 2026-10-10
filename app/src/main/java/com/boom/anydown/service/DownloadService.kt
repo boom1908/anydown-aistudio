@@ -193,6 +193,7 @@ class DownloadService : Service() {
                         status = mapped,
                         stageText = stageText,
                         statusDetail = statusDetail,
+                        formatId = request.formatId,
                         force = true
                     )
                 }
@@ -296,12 +297,20 @@ class DownloadService : Service() {
         status: DownloadStatus,
         stageText: String = "",
         statusDetail: String = "",
+        formatId: String = "",
         force: Boolean = false
     ) {
         val info = DownloadQueue.queueInfo.value
-        val isMerging = status == DownloadStatus.PROCESSING
+        val isProcessing = status == DownloadStatus.PROCESSING
         val stage = stageText.ifBlank {
-            if (isMerging) "Merging audio & video..." else "Downloading"
+            if (isProcessing) {
+                when (formatId) {
+                    "full" -> "Merging audio & video..."
+                    "mp3" -> "Converting to MP3..."
+                    "audio" -> "Finalizing audio..."
+                    else -> "Processing..."
+                }
+            } else "Downloading"
         }
         val detail = statusDetail.ifBlank { "$percent%" }
         val subtitleContent = if (stage == detail) stage else "$stage · $detail"
@@ -311,8 +320,8 @@ class DownloadService : Service() {
         } else {
             subtitleContent
         }
-        val heading = if (isMerging) "Processing: $title" else "Downloading: $title"
-        notify(buildNotification(heading, subtitle, percent, indeterminate = isMerging))
+        val heading = if (isProcessing) "Processing: $title" else "Downloading: $title"
+        notify(buildNotification(heading, subtitle, percent, indeterminate = isProcessing))
     }
 
     private fun buildNotification(

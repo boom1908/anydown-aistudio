@@ -698,7 +698,12 @@ private fun SwipeableDownloadRow(
                     }
                     DownloadStatus.PROCESSING -> {
                         Spacer(Modifier.height(4.dp))
-                        val defaultText = if (item.formatId == "mp3") "Converting audio to MP3..." else "Merging video & audio with FFmpeg..."
+                        val defaultText = when (item.formatId) {
+                            "full" -> "Merging video & audio with FFmpeg..."
+                            "mp3" -> "Converting audio to MP3 with FFmpeg..."
+                            "audio" -> "Finalizing audio file..."
+                            else -> "Finalizing download..."
+                        }
                         Text(
                             item.stageText ?: defaultText,
                             color = AnydownColors.blue,
