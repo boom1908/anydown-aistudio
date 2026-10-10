@@ -79,8 +79,18 @@ private fun ensureBinDir(context: Context, sourcePath: String) {
 
             val libCppNative = File(context.applicationInfo.nativeLibraryDir, "libc++_shared.so")
             val libCppDest = File(binDir, "libc++_shared.so")
-            if (!libCppNative.exists() && (!libCppDest.exists() || libCppDest.length() == 0L)) {
-                extractFromApk(context, "libc++_shared.so", libCppDest)
+            if (!libCppDest.exists() || libCppDest.length() == 0L) {
+                if (libCppNative.exists()) {
+                    try {
+                        Os.symlink(libCppNative.absolutePath, libCppDest.absolutePath)
+                    } catch (_: Throwable) {
+                        libCppNative.inputStream().use { input ->
+                            FileOutputStream(libCppDest).use { output -> input.copyTo(output) }
+                        }
+                    }
+                } else {
+                    extractFromApk(context, "libc++_shared.so", libCppDest)
+                }
             }
         }
     }
