@@ -43,6 +43,27 @@ def _android_get_ffmpeg_version(self, prog):
 
 FFmpegPostProcessor._get_ffmpeg_version = _android_get_ffmpeg_version
 
+_orig_get_audio_codec = FFmpegPostProcessor.get_audio_codec
+
+def _android_get_audio_codec(self, path):
+    try:
+        codec = _orig_get_audio_codec(self, path)
+        if codec:
+            return codec
+    except Exception:
+        pass
+    # If probe failed or ffprobe absent, inspect extension or return fallback so conversion proceeds
+    ext = os.path.splitext(path)[1].lower().strip('.')
+    if ext in ('m4a', 'aac'):
+        return 'aac'
+    elif ext in ('opus', 'ogg'):
+        return 'opus'
+    elif ext in ('mp3', 'wav', 'webm', 'flac'):
+        return ext
+    return 'unknown'
+
+FFmpegPostProcessor.get_audio_codec = _android_get_audio_codec
+
 def _format_duration(seconds):
     seconds = int(seconds or 0)
     m, s = divmod(seconds, 60)

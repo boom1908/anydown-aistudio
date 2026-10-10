@@ -35,6 +35,14 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        init {
+            try {
+                System.loadLibrary("c++_shared")
+            } catch (_: Throwable) {}
+        }
+    }
+
     private lateinit var viewModel: AnydownViewModel
 
     private val notificationPermissionLauncher =
