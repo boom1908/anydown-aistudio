@@ -119,9 +119,11 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
         old_ld = os.environ.get("LD_LIBRARY_PATH", "")
         if native_dir not in old_ld:
             os.environ["LD_LIBRARY_PATH"] = f"{native_dir}:{old_ld}".strip(":")
-        libcpp = os.path.join(native_dir, "libc++_shared.so")
-        if os.path.exists(libcpp):
-            os.environ["LD_PRELOAD"] = libcpp
+        for cand in ["libc++_shared.so", "libcxx.so", "libcxx_shared.so"]:
+            libcpp = os.path.join(native_dir, cand)
+            if os.path.exists(libcpp):
+                os.environ["LD_PRELOAD"] = libcpp
+                break
 
     stream_tracker = {
         "seen_audio": False,

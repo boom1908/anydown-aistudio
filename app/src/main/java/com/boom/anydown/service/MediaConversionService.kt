@@ -303,9 +303,12 @@ class MediaConversionService : Service() {
             val nativeLibDir = applicationInfo.nativeLibraryDir
             val binDir = File(filesDir, "bin").absolutePath
             pb.environment()["LD_LIBRARY_PATH"] = "$nativeLibDir:$binDir:/system/lib64"
-            val nativeCpp = File(nativeLibDir, "libc++_shared.so")
-            if (nativeCpp.exists()) {
-                pb.environment()["LD_PRELOAD"] = nativeCpp.absolutePath
+            val cxxLibNames = listOf("libc++_shared.so", "libcxx.so", "libcxx_shared.so")
+            val candidateDirs = listOf(File(nativeLibDir), File(filesDir, "bin"))
+            val cppLibToPreload = candidateDirs.flatMap { dir -> cxxLibNames.map { File(dir, it) } }
+                .firstOrNull { it.exists() && it.length() > 0L }
+            if (cppLibToPreload != null) {
+                pb.environment()["LD_PRELOAD"] = cppLibToPreload.absolutePath
             }
 
             val process = pb.start()

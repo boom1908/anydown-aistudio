@@ -77,19 +77,38 @@ private fun ensureBinDir(context: Context, sourcePath: String) {
                 }
             }
 
-            val libCppNative = File(context.applicationInfo.nativeLibraryDir, "libc++_shared.so")
-            val libCppDest = File(binDir, "libc++_shared.so")
-            if (!libCppDest.exists() || libCppDest.length() == 0L) {
-                if (libCppNative.exists()) {
-                    try {
-                        Os.symlink(libCppNative.absolutePath, libCppDest.absolutePath)
-                    } catch (_: Throwable) {
-                        libCppNative.inputStream().use { input ->
-                            FileOutputStream(libCppDest).use { output -> input.copyTo(output) }
+            val cxxLibNames = listOf("libc++_shared.so", "libcxx.so", "libcxx_shared.so")
+            val libCppNative = cxxLibNames
+                .map { File(context.applicationInfo.nativeLibraryDir, it) }
+                .firstOrNull { it.exists() && it.length() > 0L }
+
+            val primaryLibCppDest = File(binDir, "libc++_shared.so")
+            val fallbackLibCxxDest = File(binDir, "libcxx.so")
+
+            if (libCppNative != null) {
+                listOf(primaryLibCppDest, fallbackLibCxxDest).forEach { target ->
+                    if (!target.exists() || target.length() == 0L) {
+                        try {
+                            Os.symlink(libCppNative.absolutePath, target.absolutePath)
+                        } catch (_: Throwable) {
+                            libCppNative.inputStream().use { input ->
+                                FileOutputStream(target).use { output -> input.copyTo(output) }
+                            }
                         }
                     }
-                } else {
-                    extractFromApk(context, "libc++_shared.so", libCppDest)
+                }
+            } else {
+                for (libName in cxxLibNames) {
+                    if (extractFromApk(context, libName, primaryLibCppDest)) {
+                        try {
+                            if (!fallbackLibCxxDest.exists()) {
+                                Os.symlink(primaryLibCppDest.absolutePath, fallbackLibCxxDest.absolutePath)
+                            }
+                        } catch (_: Throwable) {
+                            primaryLibCppDest.copyTo(fallbackLibCxxDest, overwrite = true)
+                        }
+                        break
+                    }
                 }
             }
         }

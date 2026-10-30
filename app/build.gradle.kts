@@ -77,6 +77,7 @@ val assembleNativeLibs by tasks.registering {
   doLast {
     val jniTarget = file("src/main/jniLibs/arm64-v8a/libffmpeg.so")
     val jniLibCpp = file("src/main/jniLibs/arm64-v8a/libc++_shared.so")
+    val jniLibCxx = file("src/main/jniLibs/arm64-v8a/libcxx.so")
     val partsDir = file("src/main/native-parts/arm64-v8a")
     if (!jniTarget.exists() || jniTarget.length() == 0L) {
       val parts = partsDir.listFiles { _, name -> name.startsWith("libffmpeg.so.part-") }?.sortedBy { it.name }
@@ -87,10 +88,16 @@ val assembleNativeLibs by tasks.registering {
         }
       }
     }
-    val partsLibCpp = File(partsDir, "libc++_shared.so")
-    if ((!jniLibCpp.exists() || jniLibCpp.length() == 0L) && partsLibCpp.exists()) {
+    val candidateNames = listOf("libcxx.bin", "libcxxshared.bin", "libcxx.dat", "libcxx_shared.bin", "libc++_shared.so")
+    val partsLibCpp = candidateNames.map { File(partsDir, it) }.firstOrNull { it.exists() && it.length() > 0L }
+    if (partsLibCpp != null) {
       jniLibCpp.parentFile.mkdirs()
-      partsLibCpp.copyTo(jniLibCpp, overwrite = true)
+      if (!jniLibCpp.exists() || jniLibCpp.length() != partsLibCpp.length()) {
+        partsLibCpp.copyTo(jniLibCpp, overwrite = true)
+      }
+      if (!jniLibCxx.exists() || jniLibCxx.length() != partsLibCpp.length()) {
+        partsLibCpp.copyTo(jniLibCxx, overwrite = true)
+      }
     }
   }
 }
