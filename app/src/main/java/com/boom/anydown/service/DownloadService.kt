@@ -206,9 +206,9 @@ class DownloadService : Service() {
                 .toString()
 
             val file = File(resultPath)
-            val mime = when (request.formatId) {
-                "mp3" -> "audio/mpeg"
-                "audio" -> "audio/m4a"
+            val mime = when {
+                request.formatId == "mp3" || file.name.endsWith(".mp3", ignoreCase = true) -> "audio/mpeg"
+                request.formatId == "audio" || file.name.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
                 else -> "video/mp4"
             }
             val uri = saveToDownloads(this, file, mime)
@@ -267,8 +267,8 @@ class DownloadService : Service() {
         }
 
         return when (request.formatId) {
-            "mp3" -> "MP3 isn't available for this video — try M4A instead"
-            "audio" -> "Audio Only isn't available for this video — try Best Quality or Fast Download instead"
+            "mp3" -> "MP3 audio isn't available for this video — tap Retry or try M4A"
+            "audio" -> "Audio stream temporarily unavailable — tap Retry to download"
             "fast" -> "Fast Download isn't available for this video — try Best Quality or Audio Only instead"
             else -> "Best Quality isn't available for this video — try Audio Only or Fast Download instead"
         }

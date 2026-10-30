@@ -48,11 +48,11 @@ _orig_get_audio_codec = FFmpegPostProcessor.get_audio_codec
 def _android_get_audio_codec(self, path):
     # Check extension first to avoid executing ffprobe with unrecognized args on libffmpeg.so
     ext = os.path.splitext(path)[1].lower().strip('.')
-    if ext in ('m4a', 'aac'):
+    if ext in ('m4a', 'aac', 'mp4', 'm4v'):
         return 'aac'
-    elif ext in ('opus', 'ogg'):
+    elif ext in ('opus', 'ogg', 'webm', 'mkv'):
         return 'opus'
-    elif ext in ('mp3', 'wav', 'webm', 'flac'):
+    elif ext in ('mp3', 'wav', 'flac'):
         return ext
     try:
         codec = _orig_get_audio_codec(self, path)
@@ -204,6 +204,8 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
                     report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", downloaded, downloaded, 0)
             elif format_type == "mp3":
                 report(100, "processing", "Converting audio to MP3 with FFmpeg...", "Generating 192kbps MP3", downloaded, downloaded, 0)
+            elif format_type == "audio":
+                report(100, "processing", "Extracting M4A audio with FFmpeg...", "Finalizing M4A audio", downloaded, downloaded, 0)
             else:
                 report(100, "finished", "Download complete · Saving to folder...", f"{_format_bytes(downloaded)} ready", downloaded, downloaded, 0)
 
@@ -216,6 +218,8 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
                 report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", 0, 0, 0)
             elif format_type == "mp3":
                 report(100, "processing", "Converting audio to MP3 with FFmpeg...", "Generating 192kbps MP3", 0, 0, 0)
+            elif format_type == "audio":
+                report(100, "processing", "Extracting M4A audio with FFmpeg...", "Finalizing M4A audio", 0, 0, 0)
             else:
                 report(100, "finished", "Finalizing file...", "", 0, 0, 0)
 
@@ -251,19 +255,29 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
             'outtmpl': f'{output_dir}/%(title)s_audio.%(ext)s',
         }
     elif format_type == "audio":
-        opts = {**base, 'format': 'bestaudio[ext=m4a]/bestaudio', 'outtmpl': f'{output_dir}/%(title)s_audio.%(ext)s'}
+        opts = {
+            **base,
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'm4a',
+                'preferredquality': '192',
+            }],
+            'outtmpl': f'{output_dir}/%(title)s_audio.%(ext)s',
+        }
     else:
         opts = {**base, 'format': 'best[height<=720][ext=mp4]/best[height<=720]'}
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
         prepared = ydl.prepare_filename(info)
-        if format_type == "mp3":
+        if format_type in ("mp3", "audio"):
+            ext_target = "mp3" if format_type == "mp3" else "m4a"
             base_name = os.path.splitext(prepared)[0]
-            mp3_cand = base_name + ".mp3"
-            if os.path.exists(mp3_cand):
-                return mp3_cand
-            cand2 = prepared.rsplit('.', 1)[0] + '.mp3'
+            cand = base_name + "." + ext_target
+            if os.path.exists(cand):
+                return cand
+            cand2 = prepared.rsplit('.', 1)[0] + '.' + ext_target
             if os.path.exists(cand2):
                 return cand2
         return prepared
